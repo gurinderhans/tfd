@@ -66,9 +66,10 @@
                     }
 
                     this.StartDrag();
+                    Logger.Instance.Debug($"start 3f drag");
                 }
 
-                //TipSwitch isn't reported, so we track elapsed time to check when touch leaves & returns.
+                //`TipSwitch` isn't reported, so we track elapsed time to check when touch leaves & returns.
                 //when it returns, we record position of first touch and only move cursor when second touch
                 //occurs so relative positioning is computed correctly
                 long last3fTouchTime = this.timeSincePrev3fTouchWatch.ElapsedTicks;
@@ -91,6 +92,8 @@
                     //if dX or dY are less than 1.0, casting to int rounds it down to 0
                     int dX = (int)(deltaX * velocityX * EnvConfig.tfd_DragSpeedMultiplier);
                     int dY = (int)(deltaY * velocityY * EnvConfig.tfd_DragSpeedMultiplier);
+
+                    Logger.Instance.Debug($"timeClamped={timeClamped}, vx={velocityX}, vy={velocityY}, dx={dX}, dy={dY}");
 
                     win32.mouse_event(win32.MOUSEEVENTF_MOVE, dX, dY, 0, 0);
                 }
