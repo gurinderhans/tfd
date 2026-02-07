@@ -1,24 +1,29 @@
-using tfd.Properties;
-using System;
-using System.Windows.Forms;
-
 namespace tfd
 {
+    using tfd.Properties;
+    using System;
+    using System.Windows.Forms;
+    using System.Threading.Tasks;
+    using System.IO;
+
     public static class Program
     {
-        private static Context appContext = new Context();
         private static NotifyIcon trayIcon;
 
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
         [STAThread]
         public static void Main()
         {
-            /// corrects absolute coordinate translation when diff. scaling than 1x is applied
-            /// makes `win32.GetSystemMetrics(win32.SM_CXSCREEN)` correct correct resolution
-            bool IsProcessDPIAware = Program.appContext.LoadEnvVar(nameof(IsProcessDPIAware), false);
-            if (IsProcessDPIAware) win32.SetProcessDPIAware();
+            EnvConfig.LoadVariables();
+
+            if (!string.IsNullOrEmpty(EnvConfig.tfd_ExceptionLogFilePath))
+            {
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                Application.ThreadException += (s, e) => Program.LogUnhandledExceptions(e.Exception);
+                AppDomain.CurrentDomain.UnhandledException += (s, e) => Program.LogUnhandledExceptions(e.ExceptionObject as Exception);
+                TaskScheduler.UnobservedTaskException += (sender, e) => Program.LogUnhandledExceptions(e.Exception);
+            }
+
+            if (EnvConfig.tfd_IsProcessDPIAware) win32.SetProcessDPIAware();
 
             Program.trayIcon = new NotifyIcon()
             {
@@ -26,14 +31,26 @@ namespace tfd
                 Icon = Resources.tray_icon,
                 ContextMenu = new ContextMenu(new MenuItem[]
                 {
-                    new MenuItem("Clear Logs", (s,e) => Program.appContext.Logger.Clear()),
-                    new MenuItem("Copy Logs", (s,e) => Clipboard.SetText(Program.appContext.Logger.GetLogsAsString())),
-                    new MenuItem("Exit", (s,e) => Application.Exit()),
+                    new MenuItem(EnvConfig.tfd_TrayMenuClearLogsText, (s,e) => (Logger.Instance as Logger).Clear()),
+                    new MenuItem(EnvConfig.tfd_TrayMenuCopyLogsText, (s,e) => Clipboard.SetText((Logger.Instance as Logger).GetLogsAsString())),
+                    new MenuItem(EnvConfig.tfd_TrayMenuExitText, (s,e) => Application.Exit()),
                 }),
             };
 
-            Application.Run(new AppForm(Program.appContext));
+            Application.Run(new AppForm());
             Program.trayIcon.Dispose();
+        }
+
+        private static void LogUnhandledExceptions(Exception exception)
+        {
+            if (exception != null) Logger.Instance.Error(exception.ToString());
+
+            string allLogs = (Logger.Instance as Logger).GetLogsAsString();
+            string exceptionStr =
+                $"{DateTime.Now:u} ---------------{Environment.NewLine}"
+                + $"{allLogs}{Environment.NewLine}{Environment.NewLine}";
+
+            File.AppendAllText(EnvConfig.tfd_ExceptionLogFilePath, exceptionStr);
         }
     }
 }

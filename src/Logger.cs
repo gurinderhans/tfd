@@ -1,43 +1,57 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace tfd
+﻿namespace tfd
 {
+    using System;
+    using System.Collections.Generic;
+    using System.Diagnostics;
+
     public interface ILogger
     {
         void Info(string text);
-        void Debug(string text);
         void Error(string text);
+        void Debug(string text);
     }
 
     public class Logger : ILogger
     {
-        public bool RecordDebugLogs { get; set; }
+        private List<string> logs = new List<string>();
 
-        protected List<string> Logs = new List<string>();
-
-        public void Clear() => this.Logs.Clear();
-        public void Info(string text) => this.Log("Info", text);
-        public void Error(string text) => this.Log("Error", text);
-
-        public void Debug(string text)
+        private static Logger _instance;
+        public static ILogger Instance
         {
-            if (this.RecordDebugLogs)
+            get
             {
-                this.Log("Debug", text);
-                System.Diagnostics.Debug.WriteLine(text);
+                if (_instance == null) _instance = new Logger();
+                return _instance;
             }
         }
 
-        public string GetLogsAsString()
-        {
-            if (this.Logs.Count <= 0) return "<no logs>";
-            return string.Join(Environment.NewLine, this.Logs);
-        }
+        public void Info(string text) => this.Log("Info", text);
+
+        public void Error(string text) => this.Log("Error", text);
+
+        public void Debug(string text) => this.Log("Debug", text);
 
         private void Log(string type, string text)
         {
-            this.Logs.Add($"[{DateTime.UtcNow:hh:mm:ss.fff tt}][{type}][{text}]");
+            string logText = $"[{DateTime.UtcNow:yyyy-MM-dd hh:mm:ss.fff tt}][{type}][{new StackFrame(2).GetMethod().Name}][{text}]";
+            if (EnvConfig.tfd_EnableDebugMode)
+            {
+                System.Diagnostics.Debug.WriteLine(logText);
+                this.logs.Add(logText);
+            }
+            else if (type != "Debug")
+            {
+                this.logs.Add(logText);
+            }
+        }
+
+        public void Clear() => this.logs.Clear();
+
+        public string GetLogsAsString()
+        {
+            return this.logs.Count == 0
+                ? "<no logs>"
+                : string.Join(Environment.NewLine, this.logs);
         }
     }
 }
